@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cut-out Look</title>
+<style>
+  @font-face { font-family: Caveat; src: url(fonts/caveat.woff2); font-weight: 700; }
+  @font-face { font-family: Playfair; src: url(fonts/playfair-italic.woff2); font-style: italic; font-weight: 500; }
+  @font-face { font-family: SpaceMono; src: url(fonts/space-mono-bold.woff2); font-weight: 700; }
+  @font-face { font-family: NotoSC; src: url(fonts/noto-sc.woff2); font-weight: 700; }
+
+  :root { --paper: #ecd6d0; --ink: #1d1a19; --pen: #2b3a6b; }
+  html, body { margin: 0; background: #111; }
+  /* Stage is laid out at 540x960; rendered at 2x for 1080x1920. */
+  #stage {
+    position: relative; width: 540px; height: 960px; overflow: hidden;
+    background: var(--paper);
+  }
+  #stage::before { /* paper fibres */
+    content: ""; position: absolute; inset: -20px; z-index: 50; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35  0 0 0 0 .25  0 0 0 0 .22  0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    transform: translate(var(--gx, 0px), var(--gy, 0px));
+    mix-blend-mode: multiply;
+  }
+  #stage::after { /* soft vignette */
+    content: ""; position: absolute; inset: 0; z-index: 51; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(90,50,40,.18) 100%);
+  }
+
+  .piece { position: absolute; transform-origin: 50% 100%; will-change: transform; }
+  /* The sticker look: hard white outline + cast shadow, works on any transparent PNG/SVG. */
+  .cut img {
+    display: block; width: 100%;
+    filter:
+      drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff)
+      drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+      drop-shadow(5px 9px 6px rgba(60,30,20,.28));
+  }
+
+  #tag {
+    left: 34px; top: 92px; transform-origin: 0 50%;
+    background: var(--ink); color: #f4efe6; padding: 8px 16px 6px;
+    font: 700 19px/1 SpaceMono, monospace; letter-spacing: 2px;
+    box-shadow: 3px 4px 0 rgba(0,0,0,.18);
+    clip-path: polygon(0 4%, 100% 0, 99% 100%, 1% 96%);
+  }
+  #tag .zh { font-family: NotoSC; margin: 0 6px; letter-spacing: 0; }
+
+  #hand { left: 250px; top: 205px; transform-origin: 0 100%; color: var(--pen); }
+  #hand .txt { font: 700 30px/1 Caveat, cursive; white-space: nowrap; clip-path: inset(0 var(--reveal, 100%) 0 0); }
+  #hand svg { position: absolute; left: -6px; top: 34px; overflow: visible; }
+
+  #card {
+    left: 160px; top: 768px; width: 210px; padding: 14px 16px 12px; transform-origin: 50% 50%;
+    background: #fbf9f4; box-shadow: 4px 7px 10px rgba(60,30,20,.25);
+  }
+  #card .look { font: 500 11px/1 Playfair, serif; font-style: normal; letter-spacing: 1px; border-bottom: 1px solid var(--ink); display: inline-block; padding-bottom: 2px; }
+  #card .name { font: italic 500 25px/1.2 Playfair, serif; margin: 10px 0 4px; color: var(--ink); }
+  #card .zh { font: 700 11px/1 NotoSC, sans-serif; color: #444; letter-spacing: 1px; }
+  #card .tape {
+    position: absolute; left: 70px; top: -12px; width: 76px; height: 24px; transform: rotate(-4deg);
+    background: rgba(238,220,150,.75); box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="piece cut" id="storefront"><img></div>
+  <div class="piece cut" id="plant"><img></div>
+  <div class="piece cut" id="bistro"><img></div>
+  <div class="piece cut" id="model"><img></div>
+
+  <div class="piece" id="tag"></div>
+  <div class="piece" id="hand">
+    <div class="txt"></div>
+    <svg width="40" height="60" viewBox="0 0 40 60">
+      <path id="arrow" d="M18 2 C30 18 26 36 8 50 M8 50 L10 38 M8 50 L20 47"
+            fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+            pathLength="1" stroke-dasharray="1"/>
+    </svg>
+  </div>
+  <div class="piece" id="card"><div class="tape"></div><span class="look"></span><div class="name"></div><div class="zh"></div></div>
+</div>
+
+<script>
+// ---- Everything you'd change per SKU lives here --------------------------------
+const SCENE = {
+  duration: 6.0,          // seconds
+  stopMotionFps: 12,      // animate "on twos" - the choppy cut-out feel
+  text: {
+    tag: ['16:00', '咖啡', 'COFFEE'],
+    hand: "coffee o'clock",
+    look: 'LOOK 04',
+    name: 'Oatmeal Fine Knit',
+    zh: '燕麦细针织 · 炭灰西裤',
+  },
+  // Swap any src for a background-removed PNG of the real product/model/location.
+  // box = final resting place on the 540x960 stage; from = where it enters from.
+  pieces: {
+    storefront: { src: 'assets/storefront.svg', box: [60, 268, 440, 398], rot: 0.6,  at: 0.35, from: { y: -620, rot: -6 } },
+    plant:      { src: 'assets/plant.svg',      box: [-8, 470, 170, 272], rot: -3,   at: 0.85, from: { x: -260, rot: -14 } },
+    bistro:     { src: 'assets/bistro.svg',     box: [312, 552, 200, 217], rot: 2,   at: 1.15, from: { x: 300, rot: 12 } },
+    model:      { src: 'assets/model.svg',      box: [236, 225, 150, 467], rot: -1,  at: 1.6,  from: { x: 380, rot: 6 }, walk: true },
+  },
+  tag:  { at: 0.1 },
+  hand: { at: 2.35, write: 0.7 },
+  card: { at: 2.9, rot: -2.5 },
+};
+// ---------------------------------------------------------------------------------
+
+const $ = s => document.querySelector(s);
+$('#tag').innerHTML = `${SCENE.text.tag[0]} <span class="zh">${SCENE.text.tag[1]}</span> ${SCENE.text.tag[2]}`;
+$('#hand .txt').textContent = SCENE.text.hand;
+$('#card .look').textContent = SCENE.text.look;
+$('#card .name').textContent = SCENE.text.name;
+$('#card .zh').textContent = SCENE.text.zh;
+for (const [id, p] of Object.entries(SCENE.pieces)) {
+  const el = $('#' + id), [x, y, w] = p.box;
+  el.querySelector('img').src = p.src;
+  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px' });
+}
+
+// Deterministic pseudo-random so every render is identical.
+const rnd = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return s - Math.floor(s); };
+const clamp = v => Math.max(0, Math.min(1, v));
+const backOut = t => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function place(el, t0, dur, from, rest, step, extra = {}) {
+  const k = backOut(clamp((step.t - t0) / dur));
+  const visible = step.t >= t0;
+  // "Boil": every stop-motion frame each piece sits slightly differently, like hand-placed paper.
+  const j = visible && k > 0.98 ? 1 : 0;
+  const bx = (rnd(step.i, el.id.length) - .5) * 1.4 * j;
+  const by = (rnd(step.i, el.id.length + 7) - .5) * 1.4 * j;
+  const br = (rnd(step.i, el.id.length + 13) - .5) * 0.7 * j;
+  const x = lerp(from.x || 0, 0, k) + bx + (extra.x || 0);
+  const y = lerp(from.y || 0, 0, k) + by + (extra.y || 0);
+  const r = lerp(rest.rot + (from.rot || 0), rest.rot, k) + br + (extra.rot || 0);
+  const s = lerp(from.scale ?? 1, 1, k);
+  el.style.opacity = visible ? 1 : 0;
+  el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s})`;
+}
+
+window.seek = function (t) {
+  // Quantise time to the stop-motion rate: motion moves in visible jumps.
+  const i = Math.floor(t * SCENE.stopMotionFps);
+  const step = { t: i / SCENE.stopMotionFps, i };
+
+  place($('#tag'), SCENE.tag.at, 0.35, { scale: 1.35, rot: -8 }, { rot: -1.5 }, step);
+
+  for (const [id, p] of Object.entries(SCENE.pieces)) {
+    const extra = {};
+    if (p.walk) { // little bob while she "walks" in, then settles
+      const w = clamp((step.t - p.at) / 0.9);
+      if (w > 0 && w < 1) { extra.y = -Math.abs(Math.sin(step.i * 1.6)) * 7; extra.rot = Math.sin(step.i * 1.6) * 1.5; }
+    }
+    place($('#' + id), p.at, p.walk ? 0.9 : 0.5, p.from, { rot: p.rot }, step, extra);
+  }
+
+  // Handwriting writes itself on, then the arrow draws.
+  const h = SCENE.hand, wk = clamp((step.t - h.at) / h.write);
+  place($('#hand'), h.at, 0.01, {}, { rot: -4 }, step);
+  $('#hand .txt').style.setProperty('--reveal', (100 - wk * 100) + '%');
+  $('#arrow').style.strokeDashoffset = 1 - clamp((step.t - h.at - h.write) / 0.35);
+
+  place($('#card'), SCENE.card.at, 0.45, { y: 260, rot: 10 }, { rot: SCENE.card.rot }, step);
+
+  // Grain shifts each frame - reads as film/paper rather than a flat colour.
+  const st = $('#stage').style;
+  st.setProperty('--gx', (rnd(i, 1) * 20 - 10) + 'px');
+  st.setProperty('--gy', (rnd(i, 2) * 20 - 10) + 'px');
+};
+
+// Live preview when opened in a browser; the renderer calls seek() itself.
+if (!/render/.test(location.search)) {
+  const start = performance.now();
+  (function loop() { seek(((performance.now() - start) / 1000) % (SCENE.duration + 0.8)); requestAnimationFrame(loop); })();
+} else { seek(0); }
+window.SCENE = SCENE;
+</script>
+</body>
+</html>
